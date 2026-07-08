@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>飞羽卫士 - 声纹+压力网格监测系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr 380px;
+            gap: 16px;
+            min-height: calc(100vh - 32px);
+        }
+
+        /* ========== 左侧看板 ========== */
+        .stats-card {
+            background: #0f0f1a;
+            border-radius: 20px;
+            padding: 16px;
+            border: 1px solid #2a2a3a;
+            height: fit-content;
+        }
+
+        .stats-card h3 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #2a2a3a;
+        }
+
+        .stat-item {
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2a2a3a;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: #8a9aaa;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 0.95rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge-algorithm {
+            background: #2a9d8f;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+
+        .badge-rf {
+            background: #3a6a8a;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+
+        .online-status {
+            margin-top: 12px;
+            font-size: 0.7rem;
+            color: #6a9a6a;
+            text-align: center;
+        }
+
+        .status-badge {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #2a9d8f;
+            margin-right: 6px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* ========== 中间列 - 占满剩余高度 ========== */
+        .mid-col {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 视频卡片 - 自动撑满 */
+        .video-card {
+            background: #0f0f1a;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid #2a2a3a;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-header {
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #1a2a3a, #0f1a2a);
+            border-bottom: 1px solid #2a3a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 0.9rem;
+        }
+
+        /* 切换开关样式 */
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #0a0a12;
+            padding: 5px 14px;
+            border-radius: 40px;
+        }
+
+        .switch-label {
+            font-size: 0.8rem;
+            color: #8a9aaa;
+        }
+
+        .switch-label.active {
+            color: #2a9d8f;
+            font-weight: bold;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 52px;
+            height: 26px;
+            background: #2a2a3a;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #2a9d8f;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(26px);
+        }
+
+        /* 视频容器 - 占满剩余空间 */
+        .video-container {
+            background: #000;
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        .video-placeholder {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a1a, #1a2a3a);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #888;
+        }
+
+        /* 音频全屏显示区域 - 占满 */
+        .audio-fullscreen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a1a0a, #1a2a1a);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            padding: 40px;
+        }
+
+        .audio-fullscreen .big-spectrum {
+            width: 80%;
+            height: 180px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .audio-fullscreen .big-spectrum-bar {
+            width: 14px;
+            background: linear-gradient(180deg, #2a9d8f, #e9c46a, #e76f51);
+            border-radius: 7px;
+            transition: height 0.1s ease;
+        }
+
+        .audio-fullscreen .big-text {
+            font-size: 1.3rem;
+            color: #7aaa7a;
+        }
+
+        .audio-fullscreen .env-big {
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+            font-size: 1rem;
+            background: rgba(0,0,0,0.5);
+            padding: 15px 30px;
+            border-radius: 50px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .video-controls {
+            padding: 12px 18px;
+            background: #0a0a12;
+            display: flex;
+            gap: 15px;
+            border-top: 1px solid #2a2a3a;
+        }
+
+        /* ========== 右侧列 ========== */
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .pressure-card {
+            background: #0f0f1a;
+            border-radius: 20px;
+            padding: 16px;
+            border: 1px solid #2a2a3a;
+        }
+
+        .pressure-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .pressure-header h3 {
+            font-size: 0.95rem;
+        }
+
+        .pressure-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            aspect-ratio: 1 / 1;
+            margin: 12px 0;
+        }
+
+        .grid-cell {
+            background: #1a1a2a;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid #2a3a4a;
+            transition: all 0.2s;
+            padding: 10px 4px;
+        }
+
+        .grid-cell.active {
+            background: #e76f51;
+            border-color: #f4a261;
+            box-shadow: 0 0 10px rgba(231,111,81,0.5);
+        }
+
+        .grid-cell.warning {
+            background: #e9c46a;
+            color: #1a1a2e;
+        }
+
+        .cell-coord {
+            font-size: 0.65rem;
+            color: #8a9aaa;
+        }
+
+        .grid-cell.active .cell-coord,
+        .grid-cell.warning .cell-coord {
+            color: #1a1a2e;
+        }
+
+        .cell-value {
+            font-size: 1rem;
+            font-weight: bold;
+        }
+
+        .pressure-actions {
+            display: flex;
+            gap: 10px;
+            margin: 12px 0 8px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            background: #2a2a3a;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 30px;
+            color: #ddd;
+            cursor: pointer;
+            font-size: 0.8rem;
+            flex: 1;
+            min-width: 90px;
+        }
+
+        .action-btn.danger {
+            background: #5a2a2a;
+        }
+
+        .debug-card {
+            background: #0f0f1a;
+            border-radius: 20px;
+            padding: 16px;
+            border: 1px solid #2a2a3a;
+        }
+
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 0.8rem;
+        }
+
+        .debug-log {
+            background: #0a0a12;
+            border-radius: 12px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #7aaa7a;
+            height: 160px;
+            overflow-y: auto;
+        }
+
+        .ctrl-btn {
+            background: #2a2a3a;
+            border: none;
+            color: #ddd;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .ctrl-btn:hover,
+        .action-btn:hover {
+            background: #3a4a6a;
+            color: white;
+        }
+
+        @media (max-width: 1100px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            .video-container {
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <!-- 左侧看板 -->
+    <div class="stats-card">
+        <h3>📊 监测数据实时看板</h3>
+        <div class="stat-item"><div class="stat-label">设备ID</div><div class="stat-value">🆔 BIRD-001</div></div>
+        <div class="stat-item"><div class="stat-label">连接状态</div><div class="stat-value"><span style="color:#2a9d8f;">● 在线</span></div></div>
+        <div class="stat-item"><div class="stat-label">模式</div><div class="stat-value">自动监测 | 声纹联动 | 压力网格地听</div></div>
+        <div class="stat-item"><div class="stat-label">声音特征学习</div><div class="stat-value">🎵 +4x4压力阵列</div></div>
+        <div class="stat-item"><div class="stat-label">AI识别算法</div><div class="stat-value"><span class="badge-algorithm">声纹+视觉融合</span></div></div>
+        <div class="stat-item"><div class="stat-label">AI识别</div><div class="stat-value"><span class="badge-rf">RF-DETR正常</span></div></div>
+        <div class="stat-item"><div class="stat-label">音频状态详情</div><div class="stat-value">🎤 环境声正常</div></div>
+        <div class="stat-item"><div class="stat-label">监测目标</div><div class="stat-value">🐦 朱鹮</div></div>
+        <div class="stat-item"><div class="stat-label">云台状态</div><div class="stat-value">🎥 声纹辅助定位</div></div>
+        <div class="stat-item"><div class="stat-label">GPS定位</div><div class="stat-value">📍 108.90°E, 34.32°N</div></div>
+        <div class="stat-item"><div class="stat-label">更新时间</div><div class="stat-value">🕐 13:39:45</div></div>
+        <div class="stat-item"><div class="stat-label">当前报警点数量</div><div class="stat-value" id="alarmCountDisplay">⚠️ 0</div></div>
+        <div class="stat-item"><div class="stat-label">安全监控</div><div class="stat-value" id="securityStatus">🟢 压力网格无触发</div></div>
+        <div class="online-status"><span class="status-badge"></span> 系统在线 · 压力网格监听中</div>
+    </div>
+
+    <!-- 中间列 - 占满剩余高度 -->
+    <div class="mid-col">
+        <div class="video-card">
+            <div class="video-header">
+                <span>📹 实时视频流 | 朱鹮个体跟踪 (AI视觉+声纹融合)</span>
+                <div class="switch-container">
+                    <span class="switch-label active" id="videoLabel">🎥 视频</span>
+                    <div class="toggle-switch" id="toggleSwitch">
+                        <div class="toggle-slider"></div>
+                    </div>
+                    <span class="switch-label" id="audioLabel">🎵 音频</span>
+                </div>
+            </div>
+            <div class="video-container" id="videoContainer">
+                <!-- 视频模式内容 -->
+                <div id="videoMode" class="video-placeholder">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                        <polygon points="9,8 15,12 9,16 9,8" fill="currentColor"></polygon>
+                    </svg>
+                    <span>等待视频流接入...</span>
+                    <span style="font-size:0.7rem">RF-DETR目标检测 | 朱鹮识别正常</span>
+                </div>
+                <!-- 音频全屏模式 -->
+                <div id="audioMode" class="audio-fullscreen hidden">
+                    <div class="big-spectrum" id="bigSpectrumWave"></div>
+                    <div class="big-text">📊 实时声纹谱 · 鸟类鸣叫检测</div>
+                    <div class="env-big">
+                        <span>🔊 环境自然声</span>
+                        <span>📈 38.0 dB</span>
+                        <span>🎚️ 阈值灵敏</span>
+                    </div>
+                    <div class="env-big">
+                        <span>🌬️ 2.3 m/s</span>
+                        <span>💧 68%</span>
+                        <span>🎯 特征学习中</span>
+                    </div>
+                </div>
+            </div>
+            <div class="video-controls">
+                <button class="ctrl-btn" id="photoBtn">📸 拍照</button>
+                <button class="ctrl-btn" id="recordBtn">🎥 录像</button>
+                <button class="ctrl-btn" id="cameraCtrlBtn">🎛️ 摄像头控制</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧列 -->
+    <div class="right-col">
+        <div class="pressure-card">
+            <div class="pressure-header">
+                <h3>📌 压力阵列地图 · 4x4智能监测</h3>
+                <span style="font-size:0.65rem;">左上角(0,0) → 右下角(3,3)</span>
+            </div>
+            <div class="pressure-grid" id="pressureGrid"></div>
+            <div style="font-size:0.65rem; color:#8a9aaa; text-align:center; margin:8px 0;">
+                🔴 红色高亮=报警触发 | ⚫ 灰色=无压力 | 支持单点/多点/自动消除
+            </div>
+            <div class="pressure-actions">
+                <button class="action-btn" id="singleAlarmBtn">🔴 模拟单点报警</button>
+                <button class="action-btn" id="multiAlarmBtn">🟠 模拟多点报警</button>
+                <button class="action-btn danger" id="clearPressureBtn">🗑️ 清除全部压力</button>
+            </div>
+        </div>
+
+        <div class="debug-card">
+            <div class="debug-header">
+                <span>🔧 调试数据预留接口 | 串口/坐标解析区</span>
+                <span style="font-size:0.65rem; color:#2a9d8f;">串口监听中</span>
+            </div>
+            <div class="debug-log" id="debugLog">
+                [13:37:21] [坐标触发] 压力消除 -> (1,0)<br>
+                [13:37:21] [坐标触发] 压力消除 -> (0,0)<br>
+                [13:37:18] [坐标触发] 报警点亮 -> (1,0)<br>
+                [监听] 等待压力坐标数据接入...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 切换开关逻辑
+    let isVideoMode = true;
+    const toggleSwitch = document.getElementById('toggleSwitch');
+    const videoModeDiv = document.getElementById('videoMode');
+    const audioModeDiv = document.getElementById('audioMode');
+    const videoLabel = document.getElementById('videoLabel');
+    const audioLabel = document.getElementById('audioLabel');
+
+    function switchMode(toVideo) {
+        isVideoMode = toVideo;
+        if (isVideoMode) {
+            videoModeDiv.classList.remove('hidden');
+            audioModeDiv.classList.add('hidden');
+            toggleSwitch.classList.remove('active');
+            videoLabel.classList.add('active');
+            audioLabel.classList.remove('active');
+        } else {
+            videoModeDiv.classList.add('hidden');
+            audioModeDiv.classList.remove('hidden');
+            toggleSwitch.classList.add('active');
+            videoLabel.classList.remove('active');
+            audioLabel.classList.add('active');
+            initBigSpectrum();
+        }
+    }
+
+    toggleSwitch.addEventListener('click', () => {
+        switchMode(!isVideoMode);
+    });
+
+    // 全屏音频声纹效果
+    function initBigSpectrum() {
+        const bigContainer = document.getElementById('bigSpectrumWave');
+        if (!bigContainer) return;
+        if (bigContainer.children.length > 0) return;
+        for (let i = 0; i < 36; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'big-spectrum-bar';
+            bar.style.height = Math.floor(Math.random() * 70 + 20) + 'px';
+            bigContainer.appendChild(bar);
+        }
+        if (window.bigInterval) clearInterval(window.bigInterval);
+        window.bigInterval = setInterval(() => {
+            const bars = document.querySelectorAll('#bigSpectrumWave .big-spectrum-bar');
+            bars.forEach(bar => {
+                bar.style.height = Math.floor(Math.random() * 90 + 15) + 'px';
+            });
+        }, 200);
+    }
+
+    // 压力网格逻辑
+    let pressureData = Array(4).fill().map(() => Array(4).fill(0));
+    let alarmCount = 0;
+    let autoDemoInterval = null;
+
+    const gridContainer = document.getElementById('pressureGrid');
+    const alarmCountSpan = document.getElementById('alarmCountDisplay');
+    const securityStatusSpan = document.getElementById('securityStatus');
+    const debugLogDiv = document.getElementById('debugLog');
+
+    function addDebugLog(msg) {
+        const time = new Date().toLocaleTimeString();
+        debugLogDiv.innerHTML = `[${time}] ${msg}<br>` + debugLogDiv.innerHTML;
+        if (debugLogDiv.innerHTML.split('<br>').length > 15) {
+            const lines = debugLogDiv.innerHTML.split('<br>');
+            debugLogDiv.innerHTML = lines.slice(0, 12).join('<br>');
+        }
+    }
+
+    function updateStats() {
+        alarmCountSpan.innerHTML = `⚠️ ${alarmCount}`;
+        if (alarmCount > 0) {
+            securityStatusSpan.innerHTML = '🔴 压力网格有触发 · 需关注';
+            securityStatusSpan.style.color = '#e76f51';
+        } else {
+            securityStatusSpan.innerHTML = '🟢 压力网格无触发 · 安全监控中';
+            securityStatusSpan.style.color = '#2a9d8f';
+        }
+    }
+
+    function renderGrid() {
+        gridContainer.innerHTML = '';
+        let currentAlarmCount = 0;
+        for (let row = 0; row < 4; row++) {
+            for (let col = 0; col < 4; col++) {
+                const val = pressureData[row][col];
+                if (val > 0) currentAlarmCount++;
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                if (val > 0) {
+                    if (val >= 60) cell.classList.add('warning');
+                    else cell.classList.add('active');
+                }
+                cell.innerHTML = `<div class="cell-coord">(${col},${row})</div><div class="cell-value">${val}</div>`;
+                cell.onclick = (function(r, c) {
+                    return function() { setPressure(r, c, Math.floor(Math.random() * 80) + 20); };
+                })(row, col);
+                gridContainer.appendChild(cell);
+            }
+        }
+        alarmCount = currentAlarmCount;
+        updateStats();
+    }
+
+    function setPressure(row, col, value) {
+        if (value === 0) {
+            if (pressureData[row][col] > 0) {
+                pressureData[row][col] = 0;
+                addDebugLog(`[坐标触发] 压力消除 -> (${col},${row})`);
+            }
+        } else {
+            pressureData[row][col] = Math.min(100, value);
+            addDebugLog(`[坐标触发] 报警点亮 -> (${col},${row}) 压力值 ${pressureData[row][col]}`);
+        }
+        renderGrid();
+    }
+
+    function clearAllPressure() {
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                if (pressureData[i][j] > 0) {
+                    pressureData[i][j] = 0;
+                    addDebugLog(`[坐标触发] 压力消除 -> (${j},${i})`);
+                }
+            }
+        }
+        renderGrid();
+        addDebugLog('🗑️ 批量清除全部压力数据');
+        if (autoDemoInterval) { clearInterval(autoDemoInterval); autoDemoInterval = null; }
+    }
+
+    function simulateSinglePoint() {
+        if (autoDemoInterval) { clearInterval(autoDemoInterval); autoDemoInterval = null; }
+        const row = Math.floor(Math.random() * 4);
+        const col = Math.floor(Math.random() * 4);
+        setPressure(row, col, Math.floor(Math.random() * 70) + 25);
+    }
+
+    function simulateMultiPoint() {
+        if (autoDemoInterval) { clearInterval(autoDemoInterval); autoDemoInterval = null; }
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                if (pressureData[i][j] > 0) {
+                    pressureData[i][j] = 0;
+                    addDebugLog(`[坐标触发] 压力消除 -> (${j},${i})`);
+                }
+            }
+        }
+        const pointCount = Math.floor(Math.random() * 5) + 2;
+        for (let k = 0; k < pointCount; k++) {
+            const row = Math.floor(Math.random() * 4);
+            const col = Math.floor(Math.random() * 4);
+            const val = Math.floor(Math.random() * 70) + 20;
+            if (pressureData[row][col] === 0) {
+                pressureData[row][col] = val;
+                addDebugLog(`[坐标触发] 报警点亮 -> (${col},${row}) 压力值 ${val}`);
+            } else {
+                pressureData[row][col] = Math.max(pressureData[row][col], val);
+            }
+        }
+        renderGrid();
+        addDebugLog(`🟠 多点报警联动，共 ${pointCount} 个压力点触发`);
+    }
+
+    function startAutoDemo() {
+        if (autoDemoInterval) clearInterval(autoDemoInterval);
+        autoDemoInterval = setInterval(() => {
+            const row = Math.floor(Math.random() * 4);
+            const col = Math.floor(Math.random() * 4);
+            if (pressureData[row][col] === 0) {
+                pressureData[row][col] = Math.floor(Math.random() * 60) + 30;
+                addDebugLog(`[坐标触发] 报警点亮 -> (${col},${row}) 压力值 ${pressureData[row][col]}`);
+                renderGrid();
+            }
+            setTimeout(() => {
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        if (pressureData[i][j] > 0 && Math.random() < 0.3) {
+                            pressureData[i][j] = 0;
+                            addDebugLog(`[坐标触发] 压力消除 -> (${j},${i})`);
+                        }
+                    }
+                }
+                renderGrid();
+            }, 4000);
+        }, 7000);
+    }
+
+    renderGrid();
+    setTimeout(() => { startAutoDemo(); }, 1000);
+
+    document.getElementById('singleAlarmBtn').addEventListener('click', simulateSinglePoint);
+    document.getElementById('multiAlarmBtn').addEventListener('click', simulateMultiPoint);
+    document.getElementById('clearPressureBtn').addEventListener('click', clearAllPressure);
+    document.getElementById('photoBtn').addEventListener('click', () => alert('📸 拍照功能模拟'));
+    document.getElementById('recordBtn').addEventListener('click', () => alert('🎥 录像功能模拟'));
+    document.getElementById('cameraCtrlBtn').addEventListener('click', () => alert('🎛️ 摄像头控制面板'));
+</script>
+</body>
+</html>

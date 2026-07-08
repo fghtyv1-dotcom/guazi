@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>飞羽卫士 | 实时联动看板</title>
+    <style>
+        :root{
+            --bg:#08111d;
+            --panel:#102238;
+            --line:rgba(119,181,255,.18);
+            --text:#edf6ff;
+            --muted:#93acc7;
+            --accent:#49dcb1;
+            --accent-2:#78c6ff;
+            --danger:#ff5b6e;
+            --shadow:0 18px 50px rgba(0,0,0,.32);
+        }
+        *{box-sizing:border-box}
+        html,body{margin:0;min-height:100%;background:
+            radial-gradient(circle at top left, rgba(73,220,177,.12), transparent 28%),
+            radial-gradient(circle at top right, rgba(120,198,255,.16), transparent 30%),
+            linear-gradient(180deg, #08111d 0%, #0b1523 48%, #08111d 100%);
+            color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+        body{padding:8px 10px 14px}
+        .shell{max-width:1600px;margin:0 auto}
+        .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:4px 0 10px}
+        .brand h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
+        .brand p{margin:4px 0 0;color:var(--muted);font-size:13px}
+        .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+        .chip{padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--line);font-size:12px;color:var(--muted)}
+        .chip strong{color:var(--text)}
+        .layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(340px,.75fr);gap:12px;align-items:start}
+        .card{background:linear-gradient(180deg, rgba(20,43,69,.94), rgba(11,24,39,.98));border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+        .media-card{padding:10px}
+        .media-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 6px 10px}
+        .media-head h2{margin:0;font-size:16px}
+        .media-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+        .tab-switch{display:flex;gap:8px}
+        .tab-btn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);padding:10px 16px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600}
+        .tab-btn.active{background:linear-gradient(135deg, rgba(73,220,177,.2), rgba(120,198,255,.2));color:var(--text);border-color:rgba(120,198,255,.42)}
+        .stage{display:none}
+        .stage.active{display:block}
+        .video-wrap{position:relative;overflow:hidden;border-radius:18px;background:#000;min-height:64vh}
+        .video-wrap img{display:block;width:100%;height:64vh;object-fit:cover;object-position:center top}
+        .video-overlay{position:absolute;left:12px;right:12px;top:12px;display:flex;justify-content:space-between;gap:10px;pointer-events:none}
+        .overlay-pill{padding:7px 11px;border-radius:999px;background:rgba(8,17,29,.72);backdrop-filter:blur(8px);font-size:12px;border:1px solid rgba(255,255,255,.08)}
+        .video-foot{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin-top:12px}
+        .subcard{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:18px;padding:14px}
+        .subcard h3{margin:0 0 10px;font-size:14px}
+        .subcard p.meta{margin:0 0 10px;color:var(--muted);font-size:12px}
+        .pressure-map{position:relative;height:240px;border-radius:18px;overflow:hidden;background:
+            radial-gradient(circle at 32% 28%, rgba(73,220,177,.22), transparent 28%),
+            radial-gradient(circle at 72% 65%, rgba(255,184,77,.16), transparent 24%),
+            linear-gradient(160deg, #18324f 0%, #102238 45%, #0c1826 100%)}
+        .pressure-map::before{content:"";position:absolute;inset:14px;border-radius:26px;border:1px solid rgba(255,255,255,.08)}
+        .pressure-grid{position:absolute;inset:18px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);gap:0;background:transparent;padding:0;border-radius:22px;overflow:hidden}
+        .pressure-cell{position:relative;background:transparent;display:flex;align-items:flex-end;justify-content:flex-start;padding:8px;transition:.18s ease}
+        .pressure-cell span{opacity:0;font-size:11px;color:rgba(237,246,255,.72);letter-spacing:.08em;transition:.18s ease}
+        .pressure-cell.active{background:linear-gradient(135deg, rgba(255,91,110,.78), rgba(255,143,103,.62));box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+        .pressure-cell.active span{opacity:.9;color:#fff}
+        .pressure-legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:12px}
+        .legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+        .audio-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}
+        .audio-hero{padding:18px;min-height:64vh;display:flex;flex-direction:column;justify-content:space-between}
+        .audio-hero h3{margin:0;font-size:16px}
+        .audio-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+        .audio-metric{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:16px;padding:12px}
+        .audio-metric small{display:block;color:var(--muted);font-size:11px;margin-bottom:6px}
+        .audio-metric strong{font-size:18px}
+        .spectrum-wrap{margin-top:16px;padding:16px;border-radius:18px;background:linear-gradient(180deg, rgba(8,17,29,.72), rgba(13,27,42,.92));border:1px solid rgba(255,255,255,.06)}
+        .spectrum{height:220px;display:flex;align-items:flex-end;gap:5px}
+        .bar{flex:1;min-width:0;border-radius:999px 999px 4px 4px;background:linear-gradient(180deg, rgba(120,198,255,.95), rgba(73,220,177,.72));height:12px;transition:height .08s linear, opacity .12s ease;opacity:.6}
+        .bar.hot{background:linear-gradient(180deg, rgba(255,184,77,.95), rgba(255,91,110,.82));opacity:1}
+        .spectrum-note{margin-top:10px;color:var(--muted);font-size:12px}
+        .prob-list{display:grid;gap:10px}
+        .prob-row{display:grid;grid-template-columns:72px 1fr 50px;gap:10px;align-items:center;font-size:12px}
+        .prob-bar{height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}
+        .prob-fill{height:100%;background:linear-gradient(90deg, rgba(73,220,177,.95), rgba(120,198,255,.95))}
+        .side-card{padding:16px}
+        .side-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+        .side-head h2{margin:0;font-size:16px}
+        .status-list{display:grid;gap:10px}
+        .status-item{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
+        .status-item span{color:var(--muted);font-size:13px}
+        .status-item strong{font-size:13px;text-align:right}
+        .alert-box{margin-top:12px;padding:16px;border-radius:18px;background:linear-gradient(135deg, rgba(73,220,177,.14), rgba(120,198,255,.09));border:1px solid rgba(120,198,255,.14)}
+        .alert-box.danger{background:linear-gradient(135deg, rgba(255,91,110,.22), rgba(255,184,77,.12));border-color:rgba(255,91,110,.24)}
+        .alert-title{font-size:13px;color:var(--muted);margin-bottom:8px}
+        .alert-value{font-size:24px;font-weight:700}
+        .small{font-size:12px;color:var(--muted)}
+        .footnote{padding-top:12px;font-size:12px;color:var(--muted)}
+        .log-card{margin-top:12px;padding:14px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+        .log-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+        .log-title{font-size:13px;color:var(--muted)}
+        .log-meta{font-size:12px;color:var(--muted)}
+        .log-box{margin:0;min-height:180px;max-height:260px;overflow:auto;padding:12px 14px;border-radius:14px;background:#07111b;border:1px solid rgba(120,198,255,.12);color:#a8ffcf;font:12px/1.45 Consolas,"Courier New",monospace;white-space:pre-wrap;word-break:break-word}
+        @media (max-width: 1180px){
+            .layout,.video-foot,.audio-grid{grid-template-columns:1fr}
+            .video-wrap,.video-wrap img,.audio-hero{min-height:52vh;height:auto}
+            .video-wrap img{height:52vh}
+        }
+        @media (max-width: 760px){
+            body{padding:6px}
+            .topbar{flex-direction:column;align-items:flex-start}
+            .chips{justify-content:flex-start}
+            .audio-status{grid-template-columns:1fr}
+            .video-wrap,.video-wrap img{height:42vh;min-height:42vh}
+            .pressure-map{height:220px}
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="topbar">
+        <div class="brand">
+            <h1>飞羽卫士实时联动看板</h1>
+            <p>视频、压力、音频与情感识别统一可视化</p>
+        </div>
+        <div class="chips">
+            <div class="chip">模式 <strong id="modeChip">video</strong></div>
+            <div class="chip">AI <strong id="aiChip">初始化中</strong></div>
+            <div class="chip">舵机 <strong id="servoChip">待连接</strong></div>
+            <div class="chip">更新时间 <strong id="timeChip">--:--:--</strong></div>
+        </div>
+    </div>
+    <div class="layout">
+        <div class="card media-card">
+            <div class="media-head">
+                <div>
+                    <h2>多模态监控视图</h2>
+                    <p>视频区已顶格显示；可切换到音频情感面板查看识别细节</p>
+                </div>
+                <div class="tab-switch">
+                    <button class="tab-btn active" id="videoTabBtn" onclick="setTab('video', true)">视频视图</button>
+                    <button class="tab-btn" id="audioTabBtn" onclick="setTab('audio', true)">音频视图</button>
+                </div>
+            </div>
+            <div class="stage active" id="videoStage">
+                <div class="video-wrap">
+                    <img src="/video_feed" alt="实时视频流">
+                    <div class="video-overlay">
+                        <div class="overlay-pill">目标 <strong id="videoTarget">--</strong></div>
+                        <div class="overlay-pill">推理 <strong id="inferMs">-- ms</strong></div>
+                        <div class="overlay-pill">FPS <strong id="fpsText">--</strong></div>
+                    </div>
+                </div>
+                <div class="video-foot">
+                    <div class="subcard">
+                        <h3>压力地图</h3>
+                        <p class="meta">将原 4x4 网格整合成连续地图，报警区仍按原区域联动变红。</p>
+                        <div class="pressure-map">
+                            <div class="pressure-grid" id="pressureGrid"></div>
+                        </div>
+                        <div class="pressure-legend">
+                            <div><span class="legend-dot" style="background:rgba(237,246,255,.35)"></span>正常区域</div>
+                            <div><span class="legend-dot" style="background:linear-gradient(135deg,#ff5b6e,#ff8f67)"></span>触发报警</div>
+                        </div>
+                    </div>
+                    <div class="subcard">
+                        <h3>视觉联动概况</h3>
+                        <div class="status-list">
+                            <div class="status-item"><span>当前目标</span><strong id="targetText">--</strong></div>
+                            <div class="status-item"><span>目标数量</span><strong id="objCountText">0</strong></div>
+                            <div class="status-item"><span>跟踪模式</span><strong id="trackModeText">video</strong></div>
+                            <div class="status-item"><span>电机角度</span><strong id="angleText">0°</strong></div>
+                            <div class="status-item"><span>串口状态</span><strong id="megaText">待检测</strong></div>
+                        </div>
+                        <div class="footnote">视频模式下由视觉追踪主导舵机；切到音频模式时由声源定位主导。</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stage" id="audioStage">
+                <div class="audio-grid">
+                    <div class="subcard audio-hero">
+                        <div>
+                            <h3>音频情感与声源定位</h3>
+                            <p class="meta">来自音频识别线程的最近一次事件与实时频谱。</p>
+                            <div class="audio-status">
+                                <div class="audio-metric"><small>最近物种</small><strong id="audioSpecies">--</strong></div>
+                                <div class="audio-metric"><small>情感状态</small><strong id="audioEmotion">--</strong></div>
+                                <div class="audio-metric"><small>识别置信度</small><strong id="audioConfidence">--</strong></div>
+                                <div class="audio-metric"><small>声源方向 / 目标角</small><strong id="audioAngle">--</strong></div>
+                            </div>
+                        </div>
+                        <div class="spectrum-wrap">
+                            <div class="spectrum" id="audioSpectrum"></div>
+                            <div class="spectrum-note" id="audioNote">等待音频频谱流...</div>
+                        </div>
+                    </div>
+                    <div class="subcard">
+                        <h3>音频识别细节</h3>
+                        <div class="status-list">
+                            <div class="status-item"><span>最近事件时间</span><strong id="audioEventAge">--</strong></div>
+                            <div class="status-item"><span>振幅</span><strong id="audioAmp">--</strong></div>
+                            <div class="status-item"><span>情感相似度</span><strong id="audioEmotionSim">--</strong></div>
+                            <div class="status-item"><span>分析循环次数</span><strong id="audioIterations">--</strong></div>
+                        </div>
+                        <div style="height:12px"></div>
+                        <h3>类别概率</h3>
+                        <div class="prob-list" id="probList"></div>
+                        <div class="footnote">若未运行 orchestrator，音频情感字段会保持为空，但频谱仍可显示。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card side-card">
+            <div class="side-head">
+                <h2>系统状态</h2>
+                <div class="small" id="uptimeText">Uptime --</div>
+            </div>
+            <div class="status-list">
+                <div class="status-item"><span>AI状态</span><strong id="aiText">初始化中</strong></div>
+                <div class="status-item"><span>音频状态</span><strong id="audioStateText">等待事件</strong></div>
+                <div class="status-item"><span>舵机连接</span><strong id="ptzText">待检测</strong></div>
+                <div class="status-item"><span>摄像头帧数</span><strong id="cameraFramesText">--</strong></div>
+                <div class="status-item"><span>事件队列</span><strong id="eventQueueText">--</strong></div>
+                <div class="status-item"><span>控制队列</span><strong id="controlQueueText">--</strong></div>
+            </div>
+            <div class="alert-box" id="warningBox">
+                <div class="alert-title">当前告警</div>
+                <div class="alert-value" id="warningText">安全监控中</div>
+                <div class="small" id="warningMeta">暂无压力或目标触发</div>
+            </div>
+            <div class="footnote">
+                健康接口：<code>/orchestrator/health</code><br>
+                线程接口：<code>/orchestrator/threads</code><br>
+                音频频谱：<code>/audio_stream</code>
+            </div>
+            <div class="log-card">
+                <div class="log-head">
+                    <div class="log-title">mega 启动 / 调试日志</div>
+                    <div class="log-meta" id="serialMeta">等待串口数据</div>
+                </div>
+                <pre class="log-box" id="megaLogBox">(暂无串口输出)</pre>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+const pressureGrid = document.getElementById('pressureGrid');
+const spectrumEl = document.getElementById('audioSpectrum');
+const probListEl = document.getElementById('probList');
+const pressureCells = [];
+const spectrumBars = [];
+const probLabels = ['gun', 'Nipponia-nippon', 'snake', 'weasel', 'background'];
+let lastAlarmGrid = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+for(let r=0;r<4;r++){
+  for(let c=0;c<4;c++){
+    const cell = document.createElement('div');
+    cell.className = 'pressure-cell';
+    cell.innerHTML = `<span>${String.fromCharCode(65+r)}${c+1}</span>`;
+    pressureGrid.appendChild(cell);
+    pressureCells.push(cell);
+  }
+}
+for(let i=0;i<32;i++){
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  spectrumEl.appendChild(bar);
+  spectrumBars.push(bar);
+}
+function buildProbRows(){
+  probListEl.innerHTML = '';
+  probLabels.forEach((name, idx) => {
+    const row = document.createElement('div');
+    row.className = 'prob-row';
+    row.innerHTML = `<span>${name}</span><div class="prob-bar"><div class="prob-fill" id="probFill${idx}" style="width:0%"></div></div><strong id="probText${idx}">0%</strong>`;
+    probListEl.appendChild(row);
+  });
+}
+buildProbRows();
+function setText(id, text){
+  const el = document.getElementById(id);
+  if(el) el.textContent = text;
+}
+let currentTab = 'video';
+let pendingTrackMode = null;
+async function syncTrackingMode(tab){
+  try{
+    pendingTrackMode = tab;
+    const response = await fetch('/api/set', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({TRACK_MODE: tab})
+    });
+    if(!response.ok){
+      pendingTrackMode = null;
+      throw new Error(`/api/set -> ${response.status}`);
+    }
+    const payload = await response.json().catch(() => ({}));
+    const appliedMode = payload && payload.params ? payload.params.TRACK_MODE : null;
+    if(appliedMode === tab){
+      pendingTrackMode = null;
+    }
+  }catch(err){
+    pendingTrackMode = null;
+    console.warn('TRACK_MODE sync failed:', err);
+  }
+}
+async function setTab(tab, syncMode=false){
+  currentTab = tab;
+  document.getElementById('videoStage').classList.toggle('active', tab === 'video');
+  document.getElementById('audioStage').classList.toggle('active', tab === 'audio');
+  document.getElementById('videoTabBtn').classList.toggle('active', tab === 'video');
+  document.getElementById('audioTabBtn').classList.toggle('active', tab === 'audio');
+  if(syncMode){
+    await syncTrackingMode(tab);
+  }
+}
+function formatAge(ts){
+  if(!ts) return '--';
+  const diff = Math.max(0, Date.now()/1000 - ts);
+  if(diff < 1) return '刚刚';
+  if(diff < 60) return `${diff.toFixed(1)}s 前`;
+  return `${(diff/60).toFixed(1)}min 前`;
+}
+async function fetchJson(url){
+  const response = await fetch(url, {cache:'no-store'});
+  if(!response.ok) throw new Error(`${url} -> ${response.status}`);
+  return response.json();
+}
+function renderPressureMap(grid){
+  lastAlarmGrid = grid;
+  pressureCells.forEach((cell, idx) => {
+    const row = Math.floor(idx / 4);
+    const col = idx % 4;
+    const active = !!(grid[row] && grid[row][col]);
+    cell.classList.toggle('active', active);
+  });
+  const activeCount = grid.flat().filter(Boolean).length;
+  if(activeCount > 0){
+    document.getElementById('warningBox').classList.add('danger');
+    setText('warningText', `压力报警 ${activeCount} 区`);
+    setText('warningMeta', '对应区域已变红，请结合视频与音频联动判断');
+  }else{
+    document.getElementById('warningBox').classList.remove('danger');
+    setText('warningText', '安全监控中');
+    setText('warningMeta', '暂无压力或目标触发');
+  }
+}
+function renderSpectrum(bins){
+  const list = Array.isArray(bins) ? bins : [];
+  spectrumBars.forEach((bar, idx) => {
+    const value = Math.max(0, Math.min(1, Number(list[idx] || 0)));
+    bar.style.height = `${12 + value * 180}px`;
+    bar.classList.toggle('hot', value > 0.72);
+  });
+  const peak = list.length ? Math.max(...list) : 0;
+  setText('audioNote', peak > 0.18 ? '频谱活跃，正在接收环境音变化。' : '频谱较平稳，当前环境音较弱。');
+}
+function renderProbabilities(probs){
+  const list = Array.isArray(probs) ? probs : [];
+  probLabels.forEach((_, idx) => {
+    const value = Math.max(0, Math.min(1, Number(list[idx] || 0)));
+    const fill = document.getElementById(`probFill${idx}`);
+    const text = document.getElementById(`probText${idx}`);
+    if(fill) fill.style.width = `${(value * 100).toFixed(1)}%`;
+    if(text) text.textContent = `${(value * 100).toFixed(1)}%`;
+  });
+}
+function renderMegaLog(logLines, servoInfo, status){
+  const logEl = document.getElementById('megaLogBox');
+  const metaEl = document.getElementById('serialMeta');
+  const lines = (Array.isArray(logLines) ? logLines : []).filter(line => {
+    const text = String(line || '').trim();
+    return text && !text.startsWith('[tx]');
+  });
+  if(lines.length === 0){
+    logEl.textContent = '(暂无串口输出)';
+  }else{
+    const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 24;
+    logEl.textContent = lines.join('\n');
+    if(atBottom) logEl.scrollTop = logEl.scrollHeight;
+  }
+  if(servoInfo){
+    const pieces = [];
+    if(servoInfo.port) pieces.push(servoInfo.port);
+    if(typeof servoInfo.move_count !== 'undefined') pieces.push(`tx:${servoInfo.move_count}`);
+    if(typeof servoInfo.last_angle !== 'undefined' && servoInfo.last_angle !== null) {
+      pieces.push(`last:${Number(servoInfo.last_angle).toFixed(1)}°`);
+    }
+    metaEl.textContent = pieces.length ? pieces.join(' | ') : '等待串口数据';
+  }else if(status && status.mega_port){
+    metaEl.textContent = status.mega_port;
+  }else{
+    metaEl.textContent = '等待串口数据';
+  }
+}
+function applyStatus(status, health){
+  const params = (status && status.params) || {};
+  const audioStatus = health && health.audio ? health.audio : {};
+  const audioDetection = audioStatus.last_detection || {};
+  const cameraStatus = health && health.camera ? health.camera : {};
+  const queues = health && health.queues ? health.queues : {};
+  const system = health && health.system ? health.system : {};
+  const controlStatus = health && health.control ? health.control : {};
+  const servoInfo = controlStatus.servo || {};
+  const mode = system.tracking_mode || params.TRACK_MODE || 'video';
+  if(pendingTrackMode && mode === pendingTrackMode){
+    pendingTrackMode = null;
+  }
+  if(!pendingTrackMode && mode !== currentTab){
+    setTab(mode, false);
+  }
+  const target = status && status.last_target ? status.last_target : '--';
+  const objCount = status && typeof status.obj_count !== 'undefined' ? status.obj_count : 0;
+  const infMs = status && typeof status.inf_ms !== 'undefined' ? Number(status.inf_ms).toFixed(1) : '--';
+  const fps = status && typeof status.fps !== 'undefined' ? Number(status.fps).toFixed(1) : '--';
+  const servoConnected = status && status.motor_connected ? '已连接' : '未连接';
+  const megaState = status && status.mega_homed ? '已回零' : (status && status.mega_boot ? '启动中' : '待检测');
+  setText('modeChip', mode);
+  setText('aiChip', objCount > 0 ? '检测中' : '在线');
+  setText('servoChip', servoConnected);
+  setText('timeChip', new Date().toLocaleTimeString());
+  setText('videoTarget', target);
+  setText('inferMs', `${infMs} ms`);
+  setText('fpsText', fps);
+  setText('targetText', target);
+  setText('objCountText', String(objCount));
+  setText('trackModeText', mode);
+  setText('angleText', `${Number((status && status.current_angle) || 0).toFixed(1)}°`);
+  setText('megaText', `${servoConnected} / ${megaState}`);
+  setText('aiText', objCount > 0 ? `检测到 ${objCount} 个目标` : '在线待命');
+  setText('audioStateText', audioDetection.species ? `${audioDetection.species} / ${formatAge(audioDetection.timestamp)}` : '等待音频事件');
+  setText('ptzText', servoConnected);
+  setText('cameraFramesText', cameraStatus.frame_count != null ? String(cameraStatus.frame_count) : '--');
+  setText('eventQueueText', queues.event_queue != null ? String(queues.event_queue) : '--');
+  setText('controlQueueText', queues.control_queue != null ? String(queues.control_queue) : '--');
+  setText('uptimeText', system.uptime_s != null ? `Uptime ${system.uptime_s}s` : 'Uptime --');
+  setText('audioSpecies', audioDetection.species || '--');
+  setText('audioEmotion', audioDetection.emotion || '无明显情感');
+  setText('audioConfidence', audioDetection.confidence != null ? `${(audioDetection.confidence * 100).toFixed(1)}%` : '--');
+  if(audioDetection.doa_angle != null || audioDetection.target_angle != null){
+    const doa = audioDetection.doa_angle != null ? `${Number(audioDetection.doa_angle).toFixed(0)}°` : '--';
+    const tgt = audioDetection.target_angle != null ? `${Number(audioDetection.target_angle).toFixed(0)}°` : '--';
+    setText('audioAngle', `${doa} / ${tgt}`);
+  }else{
+    setText('audioAngle', '--');
+  }
+  setText('audioEventAge', formatAge(audioDetection.timestamp));
+  setText('audioAmp', audioDetection.amplitude != null ? Number(audioDetection.amplitude).toFixed(3) : '--');
+  setText('audioEmotionSim', audioDetection.emotion_similarity != null ? Number(audioDetection.emotion_similarity).toFixed(3) : '--');
+  setText('audioIterations', audioStatus.analysis_iterations != null ? String(audioStatus.analysis_iterations) : '--');
+  renderProbabilities(audioDetection.probabilities || []);
+  renderMegaLog(status && status.mega_log ? status.mega_log : [], servoInfo, status);
+  const hasPressure = lastAlarmGrid.flat().some(Boolean);
+  if(hasPressure){
+    document.getElementById('warningBox').classList.add('danger');
+  }else if(target === 'hunter'){
+    document.getElementById('warningBox').classList.add('danger');
+    setText('warningText', '最高级别报警 hunter');
+    setText('warningMeta', `检测到人员闯入 | 推理 ${infMs} ms | 目标 ${objCount} 个`);
+  }else if(target && target !== '-' && target !== '--'){
+    document.getElementById('warningBox').classList.add('danger');
+    setText('warningText', `视觉锁定 ${target}`);
+    setText('warningMeta', `推理 ${infMs} ms | 目标 ${objCount} 个`);
+  }else{
+    document.getElementById('warningBox').classList.remove('danger');
+  }
+}
+async function refreshDashboard(){
+  const jobs = await Promise.allSettled([fetchJson('/api/status'), fetchJson('/alarm'), fetchJson('/orchestrator/health')]);
+  const status = jobs[0].status === 'fulfilled' ? jobs[0].value : null;
+  const alarm = jobs[1].status === 'fulfilled' ? jobs[1].value : null;
+  const health = jobs[2].status === 'fulfilled' ? jobs[2].value : null;
+  renderPressureMap(alarm && Array.isArray(alarm.grid) ? alarm.grid : [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]);
+  applyStatus(status, health);
+}
+function initAudioStream(){
+  try{
+    const source = new EventSource('/audio_stream');
+    source.onmessage = (event) => {
+      try{
+        const data = JSON.parse(event.data || '{}');
+        renderSpectrum(data.bins || []);
+      }catch(_err){}
+    };
+    source.onerror = () => setText('audioNote', '音频频谱流暂时断开，等待重连...');
+  }catch(err){
+    setText('audioNote', `音频频谱不可用: ${err}`);
+  }
+}
+setTab('video', false);
+initAudioStream();
+refreshDashboard();
+setInterval(refreshDashboard, 1500);
+</script>
+</body>
+</html>
